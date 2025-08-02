@@ -2,8 +2,12 @@ from serpapi import GoogleSearch
 import openpyxl
 import os
 import requests
+from dotenv import load_dotenv
 
-API_KEY = "b7efae890f0534ba6546d0706387ff2b03db610dac42cc1b21c85dd5cbedd47a"
+# Load environment variables from .env
+load_dotenv()
+
+API_KEY = os.getenv("SERPAPI_KEY")
 
 
 def geocode_with_nominatim(location):
@@ -98,3 +102,4 @@ def scrape_by_name(name):
         place.get("address", ""),
         place.get("phone", "")
     ]]
+
