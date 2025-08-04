@@ -60,7 +60,7 @@ def scrape_by_location(location_name, limit=10):
             "engine": "google_maps",
             "q": "restaurants",
             "type": "search",
-            "ll": f"@{lat},{lng},20z",
+            "ll": f"@{lat},{lng},16z",
             "start": start,
             "google_domain": "google.co.in",
             "hl": "en",
@@ -102,4 +102,5 @@ def scrape_by_name(name):
         place.get("address", ""),
         place.get("phone", "")
     ]]
+
 
