@@ -47,44 +47,107 @@ def save_to_excel(filename, rows):
     wb.save(filename)
 
 
-def scrape_by_location(location_name, limit=10):
+# def scrape_by_location(location_name, limit=10):
+#     lat, lng = geocode_with_nominatim(location_name)
+#     if not lat or not lng:
+#         return [["❌ Could not geocode location: " + location_name]]
+
+#     all_data = []
+#     start = 0
+
+#     while len(all_data) < limit:
+#         params = {
+#             "engine": "google_maps",
+#             "q": "restaurants",
+#             "type": "search",
+#             "ll": f"@{lat},{lng},16z",
+#             "start": start,
+#             "google_domain": "google.co.in",
+#             "hl": "en",
+#             "api_key": API_KEY
+#         }
+
+#         search = GoogleSearch(params)
+#         results = search.get_dict()
+#         places = results.get("local_results", [])
+
+#         if not places:
+#             break  # No more results
+
+#         for place in places:
+#             if len(all_data) >= limit:
+#                 break
+#             name = place.get("title", "")
+#             address = place.get("address", "")
+#             phone = place.get("phone", "")
+#             all_data.append([name, address, phone])
+
+#         start += 20  # Go to next page if needed
+
+#     return all_data
+
+
+
+
+def scrape_by_location(location_name, limit=50):
     lat, lng = geocode_with_nominatim(location_name)
     if not lat or not lng:
         return [["❌ Could not geocode location: " + location_name]]
 
     all_data = []
+    seen = set()
     start = 0
 
     while len(all_data) < limit:
         params = {
             "engine": "google_maps",
-            "q": "restaurants",
+            "q": f"Zomato site listed top rated restaurants cafes {location_name}",
             "type": "search",
-            "ll": f"@{lat},{lng},16z",
+            "ll": f"@{lat},{lng},16z",             
             "start": start,
             "google_domain": "google.co.in",
             "hl": "en",
+            "gl": "in",                             
+            "location": location_name,             
             "api_key": API_KEY
         }
 
-        search = GoogleSearch(params)
-        results = search.get_dict()
-        places = results.get("local_results", [])
+        try:
+            search = GoogleSearch(params)
+            results = search.get_dict()
+            places = results.get("local_results", [])
 
-        if not places:
-            break  # No more results
+            if not places:
+                break  # No more results
 
-        for place in places:
-            if len(all_data) >= limit:
-                break
-            name = place.get("title", "")
-            address = place.get("address", "")
-            phone = place.get("phone", "")
-            all_data.append([name, address, phone])
+            for place in places:
+                if len(all_data) >= limit:
+                    break
 
-        start += 20  # Go to next page if needed
+                name = place.get("title", "").strip()
+                address = place.get("address", "").strip()
+                phone = place.get("phone", "NA").strip()
+
+                # Avoid duplicates
+                unique_key = (name, address)
+                if unique_key in seen:
+                    continue
+                seen.add(unique_key)
+
+                all_data.append([name, address, phone])
+
+            start += 20  # pagination step
+
+        except Exception as e:
+            all_data.append([f"❌ Failed to fetch: {str(e)}"])
+            break
 
     return all_data
+
+
+
+
+
 
 def scrape_by_name(name):
     params = {
@@ -102,5 +165,6 @@ def scrape_by_name(name):
         place.get("address", ""),
         place.get("phone", "")
     ]]
+
 
 
