@@ -3,7 +3,7 @@ import openpyxl
 import os
 import requests
 from dotenv import load_dotenv
-
+from zomato_scrapper import scrapper
 # Load environment variables from .env
 load_dotenv()
 
@@ -166,6 +166,7 @@ def scrape_by_name(name):
         place.get("address", ""),
         place.get("phone", "")
     ]]
+
 
 
 
