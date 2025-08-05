@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Install system dependencies
+# Install system dependencies (grouped for readability)
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
@@ -23,19 +23,22 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     xdg-utils \
     chromium \
-    chromium-driver
+    chromium-driver \
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Copy app
+# Copy application code
 COPY . /app
 WORKDIR /app
 
-# Set chrome binary location for webdriver_manager
+# Set environment variables required by webdriver-manager and Chromium
 ENV CHROME_BIN=/usr/bin/chromium
-ENV PATH="/usr/bin:$PATH"
+ENV PATH="${PATH}:/usr/bin"
 
 # Run FastAPI app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
