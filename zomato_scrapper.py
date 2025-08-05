@@ -23,12 +23,14 @@ def scrape_zomato_links(city="bangalore", area=None, no_of_restaurants=1000):
         location_path = f"{city}/restaurants"
 
     options = Options()
-    options.add_argument("--headless")  # Use old headless mode for Docker compatibility
-    options.add_argument("--no-sandbox")  # REQUIRED for Docker/Railway
-    options.add_argument("--disable-dev-shm-usage")  # Prevent /dev/shm crashes
+    options.add_argument("--headless")  # NOT --headless=new
+    options.add_argument("--no-sandbox")  # 🔥 Absolutely required for Docker
+    options.add_argument("--disable-dev-shm-usage")  # 🔥 Prevent /dev/shm crashes
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-software-rasterizer")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--remote-debugging-port=9222")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
 
 
@@ -167,5 +169,6 @@ def get_restaurant_info(url_list, save=True):
 def scrapper(city , area , no_of_restaurants):
     urls = scrape_zomato_links(city, area, no_of_restaurants)
     return get_restaurant_info(urls, save=True)
+
 
 
