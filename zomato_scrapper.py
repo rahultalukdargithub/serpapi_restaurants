@@ -33,8 +33,9 @@ def scrape_zomato_links(city="bangalore", area=None, no_of_restaurants=1000):
     options.add_argument("--remote-debugging-port=9222")
     options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
 
-
-    driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
+    service = Service("/usr/bin/chromedriver")
+    driver = webdriver.Chrome(service=service, options=options)
+    # driver = webdriver.Chrome(executable_path="/usr/bin/chromedriver", options=options)
 
     category_ids = [None, 1, 3]
     all_links = set()
@@ -169,6 +170,7 @@ def get_restaurant_info(url_list, save=True):
 def scrapper(city , area , no_of_restaurants):
     urls = scrape_zomato_links(city, area, no_of_restaurants)
     return get_restaurant_info(urls, save=True)
+
 
 
 
