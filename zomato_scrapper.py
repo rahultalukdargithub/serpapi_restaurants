@@ -4,7 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+# from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import time
 import re
@@ -169,6 +169,7 @@ def get_restaurant_info(url_list, save=True):
 def scrapper(city , area , no_of_restaurants):
     urls = scrape_zomato_links(city, area, no_of_restaurants)
     return get_restaurant_info(urls, save=True)
+
 
 
 
