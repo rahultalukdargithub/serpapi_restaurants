@@ -145,6 +145,7 @@ def save_to_excel(filename, rows):
 #     return all_data
 
 def scrape_by_location(city,area, limit=50):
+    print("yes2")
     return scrapper(city,area, limit)
 
 
@@ -166,6 +167,7 @@ def scrape_by_name(name):
         place.get("address", ""),
         place.get("phone", "")
     ]]
+
 
 
 
