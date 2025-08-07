@@ -43,7 +43,8 @@ headers = {
 def get_info(url):
     """Extract restaurant name, address, and telephone from JSON-LD."""
     try:
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = requests.get(url, headers=headers, timeout=60)
+        print(resp)
         soup = BeautifulSoup(resp.text, 'lxml')
         scripts = soup.find_all('script', type='application/ld+json')
         if len(scripts) < 2:
@@ -293,5 +294,6 @@ def scrapper(city , area , no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
 
