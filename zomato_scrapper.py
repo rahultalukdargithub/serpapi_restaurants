@@ -180,6 +180,7 @@ def get_restaurant_info(urls, workers=8):
 def scrapper(city, area, no_of_restaurants):
     urls = scrape_zomato_link(city, area, no_of_restaurants)
     print("Fetched links:", len(urls))
+    print(urls)
     if not urls:
         # Early return to make the problem obvious
         return []
@@ -395,6 +396,7 @@ def scrapper(city, area, no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
 
 
