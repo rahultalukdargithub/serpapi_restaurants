@@ -13,31 +13,44 @@
 from bs4 import BeautifulSoup
 import json
 import requests
-import pandas as pd
-from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-
-
-
-def scrape_zomato_link(city, area=None, no_of_restaurants=1000):
-    """Scrape Zomato restaurant links for a given city and area."""
+# ---------- LINK FETCH (from your backend) ----------
+def scrape_zomato_link(city, area=None, no_of_restaurants=1000, timeout=30):
+    """Get Zomato restaurant links from your Railway backend."""
     city = city.strip().lower().replace(" ", "-")
     area = area.strip().lower().replace(" ", "-") if area else None
-    base_url = "https://serpapiperpeteer-production.up.railway.app/"
-    if(area):
-        j = requests.get(base_url + f"/api/data/location?city={city}&area={area}&limit={no_of_restaurants}")
-    else:
-        j =requests.get(base_url + f"/api/data/location?city={city}&limit={no_of_restaurants}")
 
-    json_data = j.json()
-    json_data = json_data['data']
-    return json_data
+    # Remove trailing slash OR remove leading slash below to avoid double-slash
+    base_url = "https://serpapiperpeteer-production.up.railway.app"
+
+    try:
+        if area:
+            url = f"{base_url}/api/data/location?city={city}&area={area}&limit={no_of_restaurants}"
+        else:
+            url = f"{base_url}/api/data/location?city={city}&limit={no_of_restaurants}"
+
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        payload = r.json()
+        data = payload.get("data", [])
+
+        # DEBUG: tell us immediately if we got nothing
+        if not data:
+            print(f"[WARN] Backend returned 0 links for city='{city}', area='{area}'. URL={url}")
+        else:
+            # normalize: ensure absolute URLs
+            data = [u if u.startswith("http") else f"https://www.zomato.com{u}" for u in data]
+        return data
+
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch links from backend: {e}")
+        return []
 
 
+# ---------- DETAILS FETCH (direct to Zomato) ----------
 from curl_cffi import requests as cf
-from bs4 import BeautifulSoup
-import json, re, time, random
+import time, random, re
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -54,54 +67,106 @@ BASE_HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
+def _parse_jsonld(soup: BeautifulSoup):
+    """Find JSON-LD with Restaurant info (handles list and @graph)."""
+    for tag in soup.find_all("script", type="application/ld+json"):
+        text = (tag.string or "").strip()
+        if not text:
+            continue
+        try:
+            obj = json.loads(text)
+        except Exception:
+            continue
+
+        candidates = []
+        if isinstance(obj, list):
+            candidates = obj
+        elif isinstance(obj, dict):
+            if "@graph" in obj and isinstance(obj["@graph"], list):
+                candidates = obj["@graph"]
+            else:
+                candidates = [obj]
+
+        for it in candidates:
+            t = it.get("@type")
+            if t in ("Restaurant", "LocalBusiness"):
+                return it
+    return None
+
+def _fallbacks(soup: BeautifulSoup):
+    """Fallbacks when JSON-LD is missing/incomplete."""
+    # Name fallback
+    name = None
+    h1 = soup.find("h1")
+    if h1:
+        name = h1.get_text(strip=True) or None
+
+    # Address fallback: look for a 'address' microdata or obvious selector
+    address = None
+    addr = soup.select_one("[itemprop='streetAddress']") or soup.find("address")
+    if addr:
+        address = addr.get_text(" ", strip=True)
+
+    # Phone fallback from tel: link
+    phone = None
+    tel = soup.select_one("a[href^='tel:']")
+    if tel:
+        phone = tel.get_text(strip=True) or tel.get("href", "").replace("tel:", "")
+
+    return name, address, phone
+
 def get_info(url, timeout=60, max_retries=3, proxy=None):
     with cf.Session() as s:
         s.headers.update(BASE_HEADERS)
-        # optional: s.proxies = {"http": proxy, "https": proxy}
-        # Warm-up to get cookies
-        for attempt in range(1, max_retries+1):
+        if proxy:
+            s.proxies = {"http": proxy, "https": proxy}
+
+        for attempt in range(1, max_retries + 1):
             try:
                 r = s.get(url, timeout=timeout, impersonate="chrome124", allow_redirects=True)
-                if r.status_code == 403:
-                    # brief backoff + retry (rotate proxy if you have one)
+                # Detect blocks
+                if r.status_code in (403, 429):
                     time.sleep(1.5 * attempt + random.random())
                     continue
+
                 r.raise_for_status()
                 soup = BeautifulSoup(r.text, "lxml")
 
-                # Find JSON-LD with @type Restaurant
-                data = None
-                for tag in soup.find_all("script", type="application/ld+json"):
-                    try:
-                        blob = json.loads(tag.string or "{}")
-                        # sometimes it's a list
-                        items = blob if isinstance(blob, list) else [blob]
-                        for it in items:
-                            if it.get("@type") in ("Restaurant", "LocalBusiness"):
-                                data = it
-                                break
-                        if data:
-                            break
-                    except Exception:
-                        continue
+                data = _parse_jsonld(soup)
+                if data:
+                    addr = data.get("address") or {}
+                    name = data.get("name")
+                    address = (addr.get("streetAddress")
+                               or addr.get("addressLocality")
+                               or addr.get("addressRegion")
+                               or addr.get("addressCountry"))
+                    phone = (data.get("telephone") or "NA").strip()
+                else:
+                    # Use fallbacks if JSON-LD not found
+                    name, address, phone = _fallbacks(soup)
+                    phone = phone or "NA"
 
-                if not data:
+                if not any([name, address, phone]):
+                    # maybe blocked by interstitial
+                    title = soup.title.get_text(strip=True) if soup.title else ""
+                    if "Access denied" in title or "Just a moment" in r.text:
+                        time.sleep(1.5 * attempt + random.random())
+                        continue
+                    # otherwise, treat as no data found
                     return None
 
-                addr = data.get("address") or {}
-                return {
-                    "Name": data.get("name"),
-                    "Address": addr.get("streetAddress") or addr.get("addressLocality"),
-                    "Phone": (data.get("telephone") or "NA").strip(),
-                }
+                return {"Name": name, "Address": address, "Phone": phone}
+
             except Exception:
                 time.sleep(1.5 * attempt + random.random())
         return None
 
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
 def get_restaurant_info(urls, workers=8):
+    if not urls:
+        print("[WARN] No URLs provided to get_restaurant_info()")
+        return []
+
     out = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(get_info, u): u for u in urls}
@@ -112,10 +177,14 @@ def get_restaurant_info(urls, workers=8):
     return out
 
 
-def scrapper(city , area , no_of_restaurants):
+def scrapper(city, area, no_of_restaurants):
     urls = scrape_zomato_link(city, area, no_of_restaurants)
-    print(len(urls))
-    return get_restaurant_info(urls,8)
+    print("Fetched links:", len(urls))
+    if not urls:
+        # Early return to make the problem obvious
+        return []
+    return get_restaurant_info(urls, workers=8)
+
 
 
 
@@ -326,6 +395,7 @@ def scrapper(city , area , no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
 
 
