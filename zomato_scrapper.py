@@ -35,49 +35,81 @@ def scrape_zomato_link(city, area=None, no_of_restaurants=1000):
     return json_data
 
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+from curl_cffi import requests as cf
+from bs4 import BeautifulSoup
+import json, re, time, random
+
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+BASE_HEADERS = {
+    "User-Agent": UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Referer": "https://www.zomato.com/",
+    "DNT": "1",
+    "Upgrade-Insecure-Requests": "1",
 }
 
-def get_info(url):
-    """Extract restaurant name, address, and telephone from JSON-LD."""
-    try:
-        resp = requests.get(url, headers=headers, timeout=60)
-        print(resp)
-        soup = BeautifulSoup(resp.text, 'lxml')
-        scripts = soup.find_all('script', type='application/ld+json')
-        if len(scripts) < 2:
-            return None
+def get_info(url, timeout=60, max_retries=3, proxy=None):
+    with cf.Session() as s:
+        s.headers.update(BASE_HEADERS)
+        # optional: s.proxies = {"http": proxy, "https": proxy}
+        # Warm-up to get cookies
+        for attempt in range(1, max_retries+1):
+            try:
+                r = s.get(url, timeout=timeout, impersonate="chrome124", allow_redirects=True)
+                if r.status_code == 403:
+                    # brief backoff + retry (rotate proxy if you have one)
+                    time.sleep(1.5 * attempt + random.random())
+                    continue
+                r.raise_for_status()
+                soup = BeautifulSoup(r.text, "lxml")
 
-        data = json.loads(scripts[1].string)
-        name = data.get('name', None)
-        address = data.get('address', {}).get('streetAddress', None)
-        phone = data.get('telephone', "NA").strip()
-        
-        return {
-            'Name': name,
-            'Address': address,
-            'Phone': phone
-        }
+                # Find JSON-LD with @type Restaurant
+                data = None
+                for tag in soup.find_all("script", type="application/ld+json"):
+                    try:
+                        blob = json.loads(tag.string or "{}")
+                        # sometimes it's a list
+                        items = blob if isinstance(blob, list) else [blob]
+                        for it in items:
+                            if it.get("@type") in ("Restaurant", "LocalBusiness"):
+                                data = it
+                                break
+                        if data:
+                            break
+                    except Exception:
+                        continue
 
-    except Exception as e:
-        print(f"[ERROR] {url} — {e}")
+                if not data:
+                    return None
+
+                addr = data.get("address") or {}
+                return {
+                    "Name": data.get("name"),
+                    "Address": addr.get("streetAddress") or addr.get("addressLocality"),
+                    "Phone": (data.get("telephone") or "NA").strip(),
+                }
+            except Exception:
+                time.sleep(1.5 * attempt + random.random())
         return None
 
-def get_restaurant_info(url_list, save=True):
-    """Process multiple restaurant URLs and optionally save to CSV."""
-    data = []
-    for url in url_list:
-        info = get_info(url)
-        if info:
-            data.append([
-                info['Name'],
-                info['Address'],
-                info['Phone']
-            ])
 
-    return data
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def get_restaurant_info(urls, workers=8):
+    out = []
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(get_info, u): u for u in urls}
+        for fut in as_completed(futs):
+            info = fut.result()
+            if info:
+                out.append([info["Name"], info["Address"], info["Phone"]])
+    return out
 
 
 def scrapper(city , area , no_of_restaurants):
@@ -294,6 +326,7 @@ def scrapper(city , area , no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
 
 
