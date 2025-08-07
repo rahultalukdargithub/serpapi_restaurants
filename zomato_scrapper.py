@@ -36,8 +36,7 @@ def scrape_zomato_link(city, area=None, no_of_restaurants=1000):
 
 
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 }
 
 def get_info(url):
@@ -292,4 +291,5 @@ def scrapper(city , area , no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
