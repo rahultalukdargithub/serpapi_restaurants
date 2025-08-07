@@ -17,70 +17,89 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 
-
-
-
-def scrape_zomato_link(city, area=None, no_of_restaurants=1000):
-    """Scrape Zomato restaurant links for a given city and area."""
+def scrapper(city , area , no_of_restaurants):
     city = city.strip().lower().replace(" ", "-")
     area = area.strip().lower().replace(" ", "-") if area else None
-    base_url = "https://serpapiperpeteer-production.up.railway.app/"
+    base_url = "https://latestzomato-production.up.railway.app"
     if(area):
         j = requests.get(base_url + f"/api/data/location?city={city}&area={area}&limit={no_of_restaurants}")
     else:
         j =requests.get(base_url + f"/api/data/location?city={city}&limit={no_of_restaurants}")
 
     json_data = j.json()
-    json_data = json_data['data']
-    return json_data
-
-
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-}
-
-def get_info(url):
-    """Extract restaurant name, address, and telephone from JSON-LD."""
-    try:
-        resp = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(resp.text, 'lxml')
-        scripts = soup.find_all('script', type='application/ld+json')
-        if len(scripts) < 2:
-            return None
-
-        data = json.loads(scripts[1].string)
-        name = data.get('name', None)
-        address = data.get('address', {}).get('streetAddress', None)
-        phone = data.get('telephone', "NA").strip()
-        
-        return {
-            'Name': name,
-            'Address': address,
-            'Phone': phone
-        }
-
-    except Exception as e:
-        print(f"[ERROR] {url} — {e}")
-        return None
-
-def get_restaurant_info(url_list, save=True):
-    """Process multiple restaurant URLs and optionally save to CSV."""
     data = []
-    for url in url_list:
-        info = get_info(url)
-        if info:
-            data.append([
-                info['Name'],
-                info['Address'],
-                info['Phone']
-            ])
+    for it in json_data['details']:
+        data.append([
+            it['name'],
+            it['address'],
+            it['phone']
+        ])
 
     return data
 
 
-def scrapper(city , area , no_of_restaurants):
-    urls = scrape_zomato_link(city, area, no_of_restaurants)
-    return get_restaurant_info(urls, save=True)
+# def scrape_zomato_link(city, area=None, no_of_restaurants=1000):
+#     """Scrape Zomato restaurant links for a given city and area."""
+#     city = city.strip().lower().replace(" ", "-")
+#     area = area.strip().lower().replace(" ", "-") if area else None
+#     # https://latestzomato-production.up.railway.app/api/data/location?city=kolkata&area=park-street&limit=5 
+#     base_url = "https://latestzomato-production.up.railway.app/"
+#     if(area):
+#         j = requests.get(base_url + f"/api/data/location?city={city}&area={area}&limit={no_of_restaurants}")
+#     else:
+#         j =requests.get(base_url + f"/api/data/location?city={city}&limit={no_of_restaurants}")
+
+#     json_data = j.json()
+#     json_data = json_data['data']
+#     return json_data
+
+
+# headers = {
+#     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+# }
+
+# def get_info(url):
+#     """Extract restaurant name, address, and telephone from JSON-LD."""
+#     try:
+#         resp = requests.get(url, headers=headers, timeout=10)
+#         soup = BeautifulSoup(resp.text, 'lxml')
+#         scripts = soup.find_all('script', type='application/ld+json')
+#         if len(scripts) < 2:
+#             return None
+
+#         data = json.loads(scripts[1].string)
+#         name = data.get('name', None)
+#         address = data.get('address', {}).get('streetAddress', None)
+#         phone = data.get('telephone', "NA").strip()
+        
+#         return {
+#             'Name': name,
+#             'Address': address,
+#             'Phone': phone
+#         }
+
+#     except Exception as e:
+#         print(f"[ERROR] {url} — {e}")
+#         return None
+
+# def get_restaurant_info(url_list, save=True):
+#     """Process multiple restaurant URLs and optionally save to CSV."""
+#     data = []
+#     for url in url_list:
+#         info = get_info(url)
+#         if info:
+#             data.append([
+#                 info['Name'],
+#                 info['Address'],
+#                 info['Phone']
+#             ])
+
+#     return data
+
+
+# def scrapper(city , area , no_of_restaurants):
+#     urls = scrape_zomato_link(city, area, no_of_restaurants)
+#     return get_restaurant_info(urls, save=True)
 
 
 
@@ -291,5 +310,6 @@ def scrapper(city , area , no_of_restaurants):
 #         await browser.close()
 
 #     return list(all_links)
+
 
 
